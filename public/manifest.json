@@ -1,0 +1,69 @@
+{
+  "id": "/",
+  "name": "Bas de Laine",
+  "short_name": "BdL",
+  "description": "Gestion de budget familial par enveloppes",
+  "lang": "fr",
+  "start_url": "/enveloppes",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#5B8A72",
+  "background_color": "#FAF8F5",
+  "categories": ["finance"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/screenshot-mobile-1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Vue des enveloppes budgétaires"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-2.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Vue de la trésorerie"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Enveloppes",
+      "short_name": "Enveloppes",
+      "description": "Voir les enveloppes budgétaires",
+      "url": "/enveloppes",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Trésorerie",
+      "short_name": "Trésorerie",
+      "description": "Consulter la trésorerie",
+      "url": "/tresorerie",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

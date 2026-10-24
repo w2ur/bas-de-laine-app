@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ──────────────────────────────────────────────
+
+enum EnvelopeType {
+  BUDGET
+  GOAL
+
+  @@map("envelope_type")
+}
+
+enum FillCadence {
+  WEEKLY
+  MONTHLY
+
+  @@map("fill_cadence")
+}
+
+enum EnvelopeTransactionType {
+  FILL
+  SPEND
+  TRANSFER_IN
+  TRANSFER_OUT
+
+  @@map("envelope_transaction_type")
+}
+
+enum TreasuryAdjustmentType {
+  SET
+  DEDUCT
+  REFRESH
+
+  @@map("treasury_adjustment_type")
+}
+
+enum TreasuryAvailability {
+  IMMEDIATE
+  SHORT
+  LONG
+
+  @@map("treasury_availability")
+}
+
+// ─── Models ─────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(cuid())
+  neonAuthId  String   @unique @map("neon_auth_id") @db.Uuid
+  name        String
+  email       String   @unique
+  householdId String   @map("household_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@map("users")
+}
+
+model Household {
+  id        String   @id @default(cuid())
+  income    Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users            User[]
+  envelopes        Envelope[]
+  recurringCharges RecurringCharge[]
+  treasury         Treasury?
+
+  @@map("households")
+}
+
+model Envelope {
+  id            String       @id @default(cuid())
+  householdId   String       @map("household_id")
+  name          String
+  type          EnvelopeType @default(BUDGET)
+  targetAmount  Decimal?     @map("target_amount") @db.Decimal(12, 2)
+  targetDate    DateTime?    @map("target_date") @db.Date
+  monthlyBudget Decimal?     @default(0) @map("monthly_budget") @db.Decimal(12, 2)
+  fillCadence   FillCadence  @default(WEEKLY) @map("fill_cadence")
+  icon          String?
+  color         String?
+  sortOrder     Int          @default(0) @map("sort_order")
+  isArchived    Boolean      @default(false) @map("is_archived")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  household    Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  transactions EnvelopeTransaction[]
+
+  @@unique([householdId, name])
+  @@map("envelopes")
+}
+
+model EnvelopeTransaction {
+  id                  String                   @id @default(cuid())
+  envelopeId          String                   @map("envelope_id")
+  date                DateTime                 @default(now()) @db.Date
+  amount              Decimal                  @db.Decimal(12, 2)
+  type                EnvelopeTransactionType
+  description         String?
+  linkedTransactionId String?                  @unique @map("linked_transaction_id")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+
+  envelope          Envelope             @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  linkedTransaction EnvelopeTransaction? @relation("TransferLink", fields: [linkedTransactionId], references: [id])
+  counterpart       EnvelopeTransaction? @relation("TransferLink")
+
+  @@index([envelopeId, date])
+  @@map("envelope_transactions")
+}
+
+model RecurringCharge {
+  id          String   @id @default(cuid())
+  householdId String   @map("household_id")
+  name        String
+  amount      Decimal  @db.Decimal(12, 2)
+  dayOfMonth  Int      @map("day_of_month")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@map("recurring_charges")
+}
+
+model Treasury {
+  id          String   @id @default(cuid())
+  householdId String   @unique @map("household_id")
+  balance     Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  household   Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  adjustments TreasuryAdjustment[]
+  pools       TreasuryPool[]
+
+  @@map("treasuries")
+}
+
+model TreasuryAdjustment {
+  id         String                  @id @default(cuid())
+  treasuryId String                  @map("treasury_id")
+  amount     Decimal                 @db.Decimal(12, 2)
+  type       TreasuryAdjustmentType
+  label      String?
+  createdAt  DateTime                @default(now()) @map("created_at")
+
+  treasury Treasury @relation(fields: [treasuryId], references: [id], onDelete: Cascade)
+
+  @@index([treasuryId])
+  @@map("treasury_adjustments")
+}
+
+model TreasuryPool {
+  id           String               @id @default(cuid())
+  treasuryId   String               @map("treasury_id")
+  name         String
+  availability TreasuryAvailability
+  amount       Decimal              @default(0) @db.Decimal(12, 2)
+  order        Int                  @default(0)
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  treasury Treasury @relation(fields: [treasuryId], references: [id], onDelete: Cascade)
+
+  @@index([treasuryId])
+  @@map("treasury_pools")
+}

@@ -1,0 +1,12 @@
+title = "bas-de-laine gitleaks config"
+
+[extend]
+useDefault = true
+
+# The CI workflow builds with a fixed placeholder cookie secret (it decodes to a
+# "placeholder ... testing only" string). It protects nothing and never reaches a
+# deployment, so it is allowlisted by exact value rather than by path: a real key
+# added to ci.yml would still be reported.
+[[allowlists]]
+description = "CI build placeholder for NEON_AUTH_COOKIE_SECRET"
+regexes = ['''cGxhY2Vob2xkZXItc2VjcmV0LWZvcmNpLXRlc3Rpbmctb25seQ==''']

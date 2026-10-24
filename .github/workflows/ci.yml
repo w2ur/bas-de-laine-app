@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    # Placeholder values: prisma.config.ts resolves DIRECT_URL at load time and
+    # next build needs the Neon Auth vars present; no step talks to a real service.
+    env:
+      DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+      DIRECT_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+      NEON_AUTH_BASE_URL: "https://placeholder.auth.neon.tech"
+      NEON_AUTH_COOKIE_SECRET: "cGxhY2Vob2xkZXItc2VjcmV0LWZvcmNpLXRlc3Rpbmctb25seQ=="
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npx prisma generate
+
+      - run: npx tsc --noEmit
+
+      - run: npm test
+
+      - run: npm run build

@@ -1,0 +1,3 @@
+-- Intentionally empty. This migration once merged spelling variants of
+-- transaction descriptions for one household's data; it is a no-op on a fresh
+-- database. The folder is kept so migration history stays continuous.
