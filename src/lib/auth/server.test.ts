@@ -7,9 +7,15 @@ const {
   findUniqueUserMock,
   createUserMock,
   findFirstHouseholdMock,
+  findUniqueHouseholdMock,
   createHouseholdMock,
   findUniqueOrThrowHouseholdMock,
+  householdRows,
 } = vi.hoisted(() => ({
+  // The households table, for the where-respecting findUnique below. Empty by default:
+  // a production-shaped database holds no demo row.
+  householdRows: [] as { id: string }[],
+  findUniqueHouseholdMock: vi.fn(),
   getSessionMock: vi.fn(),
   findUniqueUserMock: vi.fn(),
   createUserMock: vi.fn(),
@@ -32,12 +38,21 @@ vi.mock("@/lib/prisma", () => ({
     user: { findUnique: findUniqueUserMock, create: createUserMock },
     household: {
       findFirst: findFirstHouseholdMock,
+      findUnique: findUniqueHouseholdMock,
       create: createHouseholdMock,
       findUniqueOrThrow: findUniqueOrThrowHouseholdMock,
     },
   },
 }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
+
+/** findUnique that honours its where clause against householdRows. */
+function respectWhere() {
+  findUniqueHouseholdMock.mockReset().mockImplementation(
+    async ({ where }: { where: { id: string } }) => householdRows.find((row) => row.id === where.id) ?? null,
+  );
+}
+respectWhere();
 
 // ALLOWED_EMAILS is parsed once at module load, so it must be set before the import.
 process.env.ALLOWED_EMAILS = "alice@example.com";
@@ -196,5 +211,65 @@ describe("getHousehold e-mail verification", () => {
     sessionFor("stranger@example.com", true);
 
     await expect(getHousehold()).rejects.toThrow("Email non autorisé");
+  });
+});
+
+describe("getHousehold provisioning and the demo household", () => {
+  const DEMO_HOUSEHOLD_ID = "demo-household";
+  const demoCheck = { where: { id: DEMO_HOUSEHOLD_ID }, select: { id: true } };
+
+  beforeEach(() => {
+    householdRows.length = 0;
+    respectWhere();
+    getSessionMock.mockReset().mockResolvedValue({
+      data: { session: { id: "s1" }, user: { id: "neon-1", email: "alice@example.com", name: "Alice", emailVerified: true } },
+      error: null,
+    });
+    findUniqueUserMock.mockReset().mockResolvedValue(null);
+    createUserMock.mockReset().mockImplementation(async ({ data }: { data: { householdId: string } }) => ({ id: "u1", householdId: data.householdId }));
+    findFirstHouseholdMock.mockReset();
+    createHouseholdMock.mockReset().mockResolvedValue({ id: "new-household" });
+    findUniqueOrThrowHouseholdMock.mockReset().mockImplementation(async ({ where }: { where: { id: string } }) => ({ id: where.id }));
+  });
+
+  it("first sign-in on a production database: one demo check, then joins the existing household", async () => {
+    householdRows.push({ id: "family" });
+    findFirstHouseholdMock.mockResolvedValue({ id: "family" });
+
+    expect((await getHousehold()).householdId).toBe("family");
+    expect(findUniqueHouseholdMock).toHaveBeenCalledTimes(1);
+    expect(findUniqueHouseholdMock).toHaveBeenCalledWith(demoCheck);
+    // The original, unfiltered lookup.
+    expect(findFirstHouseholdMock).toHaveBeenCalledWith();
+    expect(createHouseholdMock).not.toHaveBeenCalled();
+  });
+
+  it("first sign-in on an empty database: one demo check, then a new household", async () => {
+    findFirstHouseholdMock.mockResolvedValue(null);
+
+    expect((await getHousehold()).householdId).toBe("new-household");
+    expect(findUniqueHouseholdMock).toHaveBeenCalledTimes(1);
+    expect(createHouseholdMock).toHaveBeenCalledWith({ data: {} });
+  });
+
+  // Regression: a database that ran DEMO_MODE and then switched to real sign-in made
+  // the first real member join the demo household through findFirst().
+  it("refuses a first sign-in while the demo household exists, and provisions nothing", async () => {
+    householdRows.push({ id: DEMO_HOUSEHOLD_ID });
+    findFirstHouseholdMock.mockResolvedValue({ id: DEMO_HOUSEHOLD_ID });
+
+    await expect(getHousehold()).rejects.toThrow(/données de la démo/);
+    expect(findFirstHouseholdMock).not.toHaveBeenCalled();
+    expect(createUserMock).not.toHaveBeenCalled();
+    expect(createHouseholdMock).not.toHaveBeenCalled();
+  });
+
+  it("leaves an existing member alone: no demo check, same household", async () => {
+    householdRows.push({ id: DEMO_HOUSEHOLD_ID });
+    findUniqueUserMock.mockResolvedValue({ id: "u1", householdId: "family" });
+
+    expect((await getHousehold()).householdId).toBe("family");
+    expect(findUniqueHouseholdMock).not.toHaveBeenCalled();
+    expect(findFirstHouseholdMock).not.toHaveBeenCalled();
   });
 });

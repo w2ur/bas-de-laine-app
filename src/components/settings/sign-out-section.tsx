@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { signOutAndPurge } from "@/lib/auth/sign-out";
+import { DEMO_SIGN_OUT_DISABLED } from "@/lib/demo/mode";
 
-export function SignOutSection({ email }: { email: string }) {
+export function SignOutSection({ email, demo = false }: { email: string; demo?: boolean }) {
   const [loading, setLoading] = useState(false);
 
   async function handleSignOut() {
@@ -34,10 +35,13 @@ export function SignOutSection({ email }: { email: string }) {
           <p className="text-sm text-muted-foreground">
             Connecté en tant que <span className="text-foreground">{email}</span>
           </p>
-          <Button variant="outline" onClick={handleSignOut} disabled={loading}>
+          <Button variant="outline" onClick={handleSignOut} disabled={loading || demo}>
             <LogOut className="mr-2 size-4" />
             Se déconnecter
           </Button>
+          {demo && (
+            <p className="text-sm text-muted-foreground">{DEMO_SIGN_OUT_DISABLED}</p>
+          )}
         </CardContent>
       </Card>
     </div>

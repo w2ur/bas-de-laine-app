@@ -16,10 +16,11 @@ import {
 import { Download, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { exportHouseholdData, importHouseholdData } from "@/actions/backup";
+import { DEMO_IMPORT_DISABLED } from "@/lib/demo/mode";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
-export function BackupSection() {
+export function BackupSection({ demo = false }: { demo?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingData, setPendingData] = useState<unknown>(null);
@@ -99,14 +100,15 @@ export function BackupSection() {
         <CardTitle>Sauvegarde et restauration</CardTitle>
       </CardHeader>
       <CardContent className="flex gap-4">
-        <Button onClick={handleExport} disabled={loading}>
+        {/* Outlined: « Enregistrer » (income) is the screen's one filled action (DESIGN.md). */}
+        <Button variant="outline" onClick={handleExport} disabled={loading}>
           <Download className="mr-2 size-4" />
           Exporter
         </Button>
         <Button
           variant="outline"
           onClick={() => fileInputRef.current?.click()}
-          disabled={loading}
+          disabled={loading || demo}
         >
           <Upload className="mr-2 size-4" />
           Importer
@@ -119,6 +121,11 @@ export function BackupSection() {
           onChange={handleFileSelect}
         />
       </CardContent>
+      {demo && (
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{DEMO_IMPORT_DISABLED}</p>
+        </CardContent>
+      )}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>

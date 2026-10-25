@@ -5,9 +5,15 @@ const eurFormatter = new Intl.NumberFormat("fr-FR", {
   currency: "EUR",
 });
 
+/**
+ * fr-FR money, e.g. « 1 234,50 € ». ICU groups thousands with U+202F (narrow no-break
+ * space), which Instrument Serif, the font of every figure, renders at near-zero width
+ * (« 1234,50 € »); U+00A0, the space ICU already puts before « € », renders in both
+ * fonts and still never breaks.
+ */
 export function formatCurrency(value: number | { toString(): string } | string): string {
   const num = typeof value === "number" ? value : Number(value);
-  return eurFormatter.format(num);
+  return eurFormatter.format(num).replace(/\u202F/g, "\u00A0");
 }
 
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", {

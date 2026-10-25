@@ -13,9 +13,27 @@ const NAV_ITEMS = [
   { href: "/configuration", label: "Configuration", icon: Settings },
 ] as const;
 
+interface NavUser {
+  name: string;
+  email: string;
+}
+
+/** The signed-in family member, from the Neon Auth session (fetched on the client). */
 export function DesktopNav() {
-  const pathname = usePathname();
   const { data: session } = authClient.useSession();
+  return <DesktopNavView user={session?.user ?? null} />;
+}
+
+/**
+ * DEMO_MODE: the user comes from the server (the fixed demo user). There is no Neon
+ * Auth session to fetch, and asking for one would only 404 on /api/auth/get-session.
+ */
+export function DemoDesktopNav({ user }: { user: NavUser }) {
+  return <DesktopNavView user={user} />;
+}
+
+function DesktopNavView({ user }: { user: NavUser | null }) {
+  const pathname = usePathname();
   const quickSpend = useQuickSpend();
 
   return (
@@ -62,10 +80,10 @@ export function DesktopNav() {
         })}
       </nav>
 
-      {session?.user && (
+      {user && (
         <div className="border-t p-4">
-          <p className="text-sm font-medium truncate">{session.user.name}</p>
-          <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
+          <p className="text-sm font-medium truncate">{user.name}</p>
+          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
         </div>
       )}
     </aside>

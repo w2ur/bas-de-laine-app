@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "./instance";
 import { prisma } from "@/lib/prisma";
 import { evaluateAccess } from "./access";
+import { DEMO_HOUSEHOLD_ID, isDemoMode } from "@/lib/demo/mode";
+import { getDemoHousehold } from "@/lib/demo/server";
 
 export { evaluateAccess } from "./access";
 
@@ -10,7 +12,13 @@ const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS ?? "")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
+const DEMO_DATA_IN_REAL_MODE =
+  "Cette base contient les données de la démo : videz-la ou utilisez une autre base avant d'y inscrire un vrai foyer.";
+
 export async function getHousehold() {
+  // DEMO_MODE: no session; the fixed demo household, behind the demo guard.
+  if (isDemoMode()) return getDemoHousehold();
+
   const { data, error } = await auth.getSession();
 
   // A 5xx from the Neon Auth server (or a transport failure surfaced as one) means the
@@ -58,6 +66,11 @@ export async function getHousehold() {
   // every address in ALLOWED_EMAILS joins the same household. Seeding therefore
   // stays optional (pure demo data) — the household no longer has to pre-exist.
   if (!user) {
+    // Never adopt the demo's household (a database that ran DEMO_MODE, then switched
+    // to real sign-in): refuse outright rather than merge a real member into it.
+    if (await prisma.household.findUnique({ where: { id: DEMO_HOUSEHOLD_ID }, select: { id: true } })) {
+      throw new Error(DEMO_DATA_IN_REAL_MODE);
+    }
     const household =
       (await prisma.household.findFirst()) ??
       (await prisma.household.create({ data: {} }));
@@ -71,6 +84,8 @@ export async function getHousehold() {
       },
     });
   }
+
+  if (user.householdId === DEMO_HOUSEHOLD_ID) throw new Error(DEMO_DATA_IN_REAL_MODE);
 
   const household = await prisma.household.findUniqueOrThrow({
     where: { id: user.householdId },

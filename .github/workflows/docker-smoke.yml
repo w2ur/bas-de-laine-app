@@ -1,0 +1,146 @@
+name: Docker smoke
+
+# Proves the self-hosting path: the image builds, the container applies every
+# migration to a fresh Postgres 17, and the standalone server serves the sign-in
+# page and its static files. Paths-filtered: the repo is private and minutes are billed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - compose.yaml
+      - next.config.ts
+      - package.json
+      - package-lock.json
+      - prisma/**
+      - src/lib/demo/**
+      - src/lib/auth/**
+      - src/proxy.ts
+      - src/lib/prisma.ts
+      - src/instrumentation.ts
+      - src/app/api/auth/**
+      - "src/app/(app)/layout.tsx"
+      - src/app/auth/**
+      - public/**
+      - .github/workflows/docker-smoke.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - compose.yaml
+      - next.config.ts
+      - package.json
+      - package-lock.json
+      - prisma/**
+      - src/lib/demo/**
+      - src/lib/auth/**
+      - src/proxy.ts
+      - src/lib/prisma.ts
+      - src/instrumentation.ts
+      - src/app/api/auth/**
+      - "src/app/(app)/layout.tsx"
+      - src/app/auth/**
+      - public/**
+      - .github/workflows/docker-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # Dummy auth values: nothing here signs anyone in, the page only has to render.
+      - name: Write a throwaway .env
+        run: |
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "NEON_AUTH_BASE_URL=https://placeholder.auth.neon.tech"
+            echo "NEON_AUTH_COOKIE_SECRET=$(openssl rand -base64 32)"
+            echo "ALLOWED_EMAILS=smoke@example.com"
+          } > .env
+
+      - run: docker compose up -d --build
+
+      - name: Wait for the server
+        run: |
+          for _ in $(seq 1 60); do
+            curl -fsS -o /dev/null http://localhost:3000/auth/sign-in && exit 0
+            sleep 2
+          done
+          echo "::error::the app never answered on /auth/sign-in"; exit 1
+
+      - name: Assert pages, static files and migrations
+        run: |
+          # No pipefail: `grep | head` would SIGPIPE grep and fail a match.
+          set -eu
+          status() { curl -s -o /dev/null -w '%{http_code}' "http://localhost:3000$1"; }
+          fail=0
+          check() { if [ "$2" = "$3" ]; then echo "ok   $1 -> $2"; else echo "::error::$1 -> $2, expected $3"; fail=1; fi; }
+
+          check /auth/sign-in "$(status /auth/sign-in)" 200
+          # The proxy gate is live: an anonymous visit is sent to sign-in.
+          check / "$(status /)" 307
+          # public/ and .next/static were copied next to the standalone server.
+          check /sw.js "$(status /sw.js)" 200
+          check /manifest.json "$(status /manifest.json)" 200
+          chunk=$(curl -s http://localhost:3000/auth/sign-in | grep -o '/_next/static/[^"]*\.js' | head -n 1)
+          check "${chunk:-<no chunk in page>}" "$( [ -n "$chunk" ] && status "$chunk" || echo none)" 200
+
+          psql() { docker compose exec -T db psql -U bas_de_laine -d bas_de_laine -tAc "$1"; }
+          expected=$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+          applied=$(psql "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")
+          check "applied migrations" "$applied" "$expected"
+          tables=$(psql '\dt')
+          if grep -q '|envelope_transactions|' <<<"$tables"; then echo "ok   envelope_transactions exists"
+          else echo "::error::envelope_transactions missing"; fail=1; fi
+          exit "$fail"
+
+      # The fresh database still holds no household, so the demo guard passes. Proves
+      # DEMO_MODE on a real Postgres (the first, provisioning request included), then
+      # that a non-demo household makes the server refuse every request.
+      - name: Assert DEMO_MODE serves, then refuses a real household
+        run: |
+          set -eu
+          status() { curl -s -o "${2:-/dev/null}" -w '%{http_code}' "http://localhost:3000$1"; }
+          up() { for _ in $(seq 1 60); do [ "$(status /sw.js)" != 000 ] && return 0; sleep 2; done; echo "::error::no answer"; exit 1; }
+          sed -i 's/^ALLOWED_EMAILS=.*/ALLOWED_EMAILS=/' .env
+          # Demo mode must not need Neon Auth: its variables leave the env entirely.
+          sed -i '/^NEON_AUTH_/d' .env
+          echo "DEMO_MODE=1" >> .env
+          docker compose up -d --force-recreate app
+          up
+          code=$(status /enveloppes page.html)
+          [ "$code" = 200 ] || { echo "::error::demo /enveloppes -> $code, expected 200"; exit 1; }
+          grep -q "Démo — données fictives" page.html || { echo "::error::demo banner missing"; exit 1; }
+          echo "ok   demo /enveloppes -> 200, banner shown"
+          # Healthy demo: the auth API is a 404 stub, and it never calls getHousehold().
+          code=$(status /api/auth/get-session)
+          [ "$code" = 404 ] || { echo "::error::demo /api/auth/get-session -> $code, expected 404"; exit 1; }
+
+          docker compose exec -T db psql -U bas_de_laine -d bas_de_laine -c \
+            "insert into households (id, updated_at) values ('smoke-real-household', now())"
+          docker compose restart app
+          up
+          code=$(status /enveloppes)
+          [ "$code" = 500 ] || { echo "::error::demo over a real household -> $code, expected 500"; exit 1; }
+          # The auth API stub never reaches getHousehold(), so its 404 turning into a 500
+          # is register() refusing. (Files under public/ are served even then.)
+          code=$(status /api/auth/get-session)
+          [ "$code" = 500 ] || { echo "::error::demo over a real household: /api/auth/get-session -> $code, expected 500 (register() refusal)"; exit 1; }
+          echo "ok   demo over a real household -> 500, register() refusal included"
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - if: always()
+        run: docker compose down -v

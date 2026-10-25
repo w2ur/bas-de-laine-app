@@ -10,6 +10,7 @@ import { GoalManager } from "@/components/settings/goal-manager";
 import { BackupSection } from "@/components/settings/backup-section";
 import { SignOutSection } from "@/components/settings/sign-out-section";
 import { formatCurrency } from "@/lib/format";
+import { isDemoMode } from "@/lib/demo/mode";
 import { LedgerRow } from "@/components/ui/ledger-row";
 import { ChevronRight } from "lucide-react";
 
@@ -62,9 +63,9 @@ export default async function ConfigurationPage() {
         goals={goalEnvelopes.map(goalManagerRow)}
       />
 
-      <BackupSection />
+      <BackupSection demo={isDemoMode()} />
 
-      <SignOutSection email={user.email} />
+      <SignOutSection email={user.email} demo={isDemoMode()} />
     </div>
   );
 }

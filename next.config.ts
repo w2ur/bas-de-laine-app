@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   // Opt out of the auto-generated CLAUDE.md/AGENTS.md agent-rules block that
   // `next dev` (16.3.5+) would otherwise append on every dev start.
   agentRules: false,
+  // Self-contained server in .next/standalone, for the Docker image only (the
+  // Dockerfile sets BUILD_STANDALONE=1). Opt-in rather than always on: with it,
+  // `next start` warns that it "does not work with output: standalone", and Vercel
+  // and `npm start` then build exactly what they built before.
+  output: process.env.BUILD_STANDALONE === "1" ? "standalone" : undefined,
   turbopack: {},
   // Static baseline only: a nonce-based CSP would force every page to render dynamically.
   async headers() {

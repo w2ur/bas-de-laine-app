@@ -12,6 +12,7 @@ import {
   getCurrentFinancialMonth,
   todayInParisDate,
 } from "./format";
+import { parsePastedAmount } from "@/hooks/use-cents-input";
 
 describe("formatCurrency", () => {
   it("formats a positive number as EUR", () => {
@@ -20,6 +21,20 @@ describe("formatCurrency", () => {
     expect(result).toContain("1");
     expect(result).toContain("234");
     expect(result).toContain("€");
+  });
+
+  // Regression: the U+202F thousands separator renders at near-zero width in
+  // Instrument Serif, so « 1 310,01 € » read « 1310,01 € » in every figure.
+  it("groups thousands with U+00A0, never U+202F", () => {
+    expect(formatCurrency(1234.5)).toBe("1\u00A0234,50\u00A0€");
+    expect(formatCurrency(-1234567.891)).toBe("-1\u00A0234\u00A0567,89\u00A0€");
+    expect(formatCurrency(1234.5)).not.toContain("\u202F");
+  });
+
+  it("still pastes back into a money field as the same amount", () => {
+    expect(parsePastedAmount(formatCurrency(1234.5))).toBe(123450);
+    expect(parsePastedAmount(formatCurrency(1500))).toBe(150000);
+    expect(parsePastedAmount(formatCurrency(98765.43))).toBe(9876543);
   });
 
   it("formats zero", () => {

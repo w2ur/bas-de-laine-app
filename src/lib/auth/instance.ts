@@ -1,5 +1,7 @@
-import { createNeonAuth } from "@neondatabase/auth/next/server";
+import { createNeonAuth, type NeonAuth } from "@neondatabase/auth/next/server";
 import { assertUsableCookieSecret } from "./cookie-secret";
+import { isDemoMode } from "@/lib/demo/mode";
+import { createDemoAuthStub } from "@/lib/demo/auth-stub";
 
 // Single Neon Auth instance shared by the middleware, the auth API route, and
 // server-side session reads. @neondatabase/auth 0.4.x replaced the standalone
@@ -7,7 +9,10 @@ import { assertUsableCookieSecret } from "./cookie-secret";
 // assertUsableCookieSecret (and createNeonAuth itself) throw on a missing, short or
 // example-valued NEON_AUTH_COOKIE_SECRET, so a misconfigured secret fails fast at
 // startup rather than silently degrading auth.
-export const auth = createNeonAuth({
+//
+// In DEMO_MODE nothing may reach Neon Auth and its env vars are not required, so
+// createNeonAuth is never called and every use of `auth` fails loudly instead.
+export const auth: NeonAuth = isDemoMode() ? createDemoAuthStub() : createNeonAuth({
   baseUrl: process.env.NEON_AUTH_BASE_URL!,
   cookies: {
     secret: assertUsableCookieSecret(process.env.NEON_AUTH_COOKIE_SECRET),

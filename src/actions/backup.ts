@@ -8,6 +8,7 @@ import {
   validatePayloadIntegrity,
 } from "@/lib/backup-helpers";
 import { revalidatePath } from "next/cache";
+import { DEMO_IMPORT_DISABLED, isDemoMode } from "@/lib/demo/mode";
 
 export async function exportHouseholdData() {
   const { householdId, household } = await getHousehold();
@@ -97,6 +98,11 @@ export async function exportHouseholdData() {
 // ─── Import action ─────────────────────────────────────────────────────────────
 
 export async function importHouseholdData(raw: unknown): Promise<{ error?: string }> {
+  // The demo's data is reset every night; a restore would only let one visitor
+  // replace what every other visitor sees. The button is disabled too, but the
+  // Server Action is callable on its own.
+  if (isDemoMode()) return { error: DEMO_IMPORT_DISABLED };
+
   const { householdId } = await getHousehold();
 
   const parseResult = backupSchema.safeParse(raw);

@@ -1,4 +1,4 @@
-import { DesktopNav } from "@/components/navigation/desktop-nav";
+import { DemoDesktopNav, DesktopNav } from "@/components/navigation/desktop-nav";
 import { BottomTabBar } from "@/components/navigation/bottom-tab-bar";
 import { QuickSpendProvider } from "@/components/envelopes/quick-spend-context";
 import { QuickSpendSheet } from "@/components/envelopes/quick-spend-sheet";
@@ -10,9 +10,13 @@ import { getHousehold } from "@/lib/auth/server";
 import { getEnvelopes } from "@/lib/queries/envelopes";
 import { getDescriptionSuggestions } from "@/lib/queries/descriptions";
 import { getCurrentFinancialMonth } from "@/lib/format";
+import { DemoBanner } from "@/components/demo-banner";
+import { isDemoMode } from "@/lib/demo/mode";
+
+const DEMO_MAIN_CLASS = "flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0 overflow-x-hidden";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { householdId } = await getHousehold();
+  const { householdId, user } = await getHousehold();
   const month = getCurrentFinancialMonth();
 
   const [envelopes, suggestions] = await Promise.all([
@@ -43,13 +47,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     return { ...base, type: "BUDGET" as const };
   });
 
-  return (
-    <div className="flex min-h-dvh flex-col md:flex-row">
+  const demo = isDemoMode();
+  // DEMO_MODE: the server already knows the (demo) user; the client skips the session fetch.
+  const nav = demo ? <DemoDesktopNav user={{ name: user.name, email: user.email }} /> : <DesktopNav />;
+  const shell = (
+    <div className={demo ? "flex flex-1 flex-col md:flex-row" : "flex min-h-dvh flex-col md:flex-row"}>
       <QuickSpendProvider>
-        <DesktopNav />
+        {nav}
         <PendingDeleteProvider>
           <TransferProvider>
-            <main className="flex-1 pt-[env(safe-area-inset-top)] pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0 overflow-x-hidden">
+            <main className={demo ? DEMO_MAIN_CLASS : "flex-1 pt-[env(safe-area-inset-top)] pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0 overflow-x-hidden"}>
               <div className="mx-auto w-full max-w-[880px] p-4 md:p-6">
                 {children}
               </div>
@@ -61,5 +68,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </PendingDeleteProvider>
       </QuickSpendProvider>
     </div>
+  );
+
+  // DEMO_MODE: the banner spans the full width above the sidebar and the page, and
+  // takes over the top safe-area inset from <main>.
+  return demo ? (
+    <div className="flex min-h-dvh flex-col">
+      <DemoBanner />
+      {shell}
+    </div>
+  ) : (
+    shell
   );
 }

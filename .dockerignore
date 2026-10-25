@@ -1,0 +1,18 @@
+# Never send secrets or local state into the build context.
+.env*
+!.env.example
+.git
+.github
+.next
+.vercel
+.claude
+.superpowers
+.playwright-mcp
+node_modules
+coverage
+*.numbers
+*.tsbuildinfo
+.DS_Store
+public/sw.js
+public/sw.js.map
+public/swe-worker-*.js

@@ -122,11 +122,6 @@ export default async function EnvelopeDetailPage({
             {" · "}Rempli <span className="font-display text-base text-foreground">{formatCurrency(detail.totalFilled)}</span>
             {" · "}Dépensé <span className="font-display text-base text-foreground">{formatCurrency(detail.totalSpent)}</span>
           </p>
-          {detail.fillCadence === "WEEKLY" && (
-            <p className="text-sm text-muted-foreground">
-              <span className="font-display text-base text-foreground">{formatCurrency(detail.weeklyIndicator)}</span> par semaine
-            </p>
-          )}
         </div>
         <ProgressBar percent={Math.min(Math.max(fillRatio, 0), 1) * 100} color={barColor} />
         <p className="text-sm text-muted-foreground">{formatPercent(fillRatio)} du budget rempli</p>

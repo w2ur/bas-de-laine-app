@@ -8,7 +8,12 @@ tagline_en: "Envelope budgeting for a household, minus the actual envelopes."
 
 Application de gestion de budget familial basée sur un système d'enveloppes. Bas de Laine permet de répartir les revenus du foyer dans des enveloppes virtuelles et de suivre les dépenses récurrentes.
 
-Pour faire tourner votre propre instance (vos données, vos comptes Neon et Vercel) : voir [SELF-HOSTING.md](SELF-HOSTING.md). Self-hosting guide in English and French.
+**Démo :** [demo.budget.revah.paris](https://demo.budget.revah.paris), un foyer inventé, sans connexion, remis à zéro chaque nuit.
+
+**Votre propre instance** (vos données, vos comptes). Guides en français et en anglais / self-hosting guides in French and English :
+
+- [SELF-HOSTING-BEGINNER.md](SELF-HOSTING-BEGINNER.md) : pas à pas, sans connaître le terminal ni GitHub, parcours gratuit GitHub + Vercel + Neon / step by step for beginners, free path.
+- [SELF-HOSTING.md](SELF-HOSTING.md) : guide avancé, indépendant de l'hébergeur (Docker, systemd, PaaS, sauvegardes, démo) / advanced, provider-neutral.
 
 ## Tech Stack
 
@@ -71,6 +76,8 @@ Voir `.env.example` pour la liste complète :
 | `NEON_AUTH_BASE_URL` | Endpoint Neon Auth |
 | `NEON_AUTH_COOKIE_SECRET` | Secret de signature des cookies de session, 32 caractères minimum (`openssl rand -base64 32`). L'application refuse de démarrer avec la valeur d'exemple de `.env.example` |
 | `ALLOWED_EMAILS` | Emails autorisés, séparés par des virgules — vide = nouveaux comptes refusés |
+| `POSTGRES_PASSWORD` | Docker uniquement : mot de passe du Postgres de `compose.yaml` (lettres et chiffres) |
+| `DEMO_MODE` | `1` = démo publique **sans connexion** (voir plus bas). Jamais sur une vraie instance |
 
 ### Scripts utiles
 
@@ -86,6 +93,23 @@ npm run db:seed         # Seeder la base
 ## Déploiement
 
 Conçu pour être déployé sur **Vercel** (Node 24), un déploiement par foyer. La base de données est hébergée sur **Neon** (PostgreSQL serverless).
+
+### Avec Docker
+
+`compose.yaml` lance l'application et son propre PostgreSQL 17. Les migrations s'appliquent à chaque démarrage. La connexion passe toujours par Neon Auth, donc un projet Neon (gratuit) reste nécessaire pour la connexion seulement.
+
+```bash
+cp .env.example .env     # POSTGRES_PASSWORD, NEON_AUTH_BASE_URL, NEON_AUTH_COOKIE_SECRET, ALLOWED_EMAILS
+docker compose up -d --build
+```
+
+L'application écoute sur le port 3000 ; placez-la derrière un reverse proxy HTTPS (exemples Caddy et nginx dans [SELF-HOSTING.md](SELF-HOSTING.md)).
+
+### Mode démo
+
+`DEMO_MODE=1` **désactive la connexion** : n'importe qui ayant l'adresse voit et modifie un foyer fictif unique. À réserver à une démo publique, sur une base qui lui est dédiée et n'a **jamais** contenu de vraies données. L'application refuse de servir si `ALLOWED_EMAILS` est rempli, si la base contient un autre foyer ou un autre utilisateur que ceux de la démo ; les variables Neon Auth ne sont pas nécessaires.
+
+`DEMO_MODE=1 DATABASE_URL=… npm run demo:reset` vide la base de démo et la remplit de trois mois de données fictives, après les mêmes vérifications. Planifiez-le chaque nuit (cron, tâche planifiée) : la démo officielle est remise à zéro ainsi. Codes de sortie : 0 fait, 1 refus (la base n'est pas une base de démo), 2 impossible de s'exécuter. Détails, dont un exemple de planification, dans [SELF-HOSTING.md](SELF-HOSTING.md).
 
 ## Licence
 

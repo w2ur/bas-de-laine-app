@@ -148,7 +148,7 @@ export function GoalManager({ goals }: GoalManagerProps) {
           <CardTitle>Objectifs</CardTitle>
           <CreateGoalDialog
             trigger={
-              <Button size="sm">
+              <Button size="sm" variant="outline">
                 <Plus className="size-4 mr-2" />
                 Ajouter
               </Button>

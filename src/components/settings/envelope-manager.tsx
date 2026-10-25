@@ -161,7 +161,7 @@ export function EnvelopeManager({ envelopes, pool, totalBudgets }: EnvelopeManag
           <CardTitle>Enveloppes</CardTitle>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">
+              <Button size="sm" variant="outline">
                 <Plus className="size-4 mr-2" />
                 Ajouter
               </Button>
@@ -202,7 +202,8 @@ export function EnvelopeManager({ envelopes, pool, totalBudgets }: EnvelopeManag
       </CardHeader>
       <CardContent className="space-y-4">
         {poolMismatch && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          // Neutral, not terracotta: terracotta means money out and nothing else (DESIGN.md).
+          <div role="note" className="rounded-md border bg-muted p-3 text-sm text-foreground">
             Le total des budgets ({formatCurrency(totalBudgets)}) ne correspond pas au pool disponible ({formatCurrency(pool)}).
           </div>
         )}

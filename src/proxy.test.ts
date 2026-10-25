@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { NEON_AUTH_SESSION_COOKIE_NAME } from "@neondatabase/auth/server";
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 
 const { authMiddlewareSpy } = vi.hoisted(() => ({
   authMiddlewareSpy: vi.fn(() => NextResponse.redirect(new URL("https://app.test/auth/sign-in"))),
@@ -101,7 +102,9 @@ describe("proxy", () => {
     );
 
     const response = await proxy(
-      request("https://app.test/auth/callback", {
+      // A gated path: /auth/ pages never reach the middleware (the proxy passes them
+      // through outside DEMO_MODE; see proxy.demo.test.ts), so this case lives here.
+      request("https://app.test/tresorerie", {
         headers: { cookie: `${NEON_AUTH_SESSION_COOKIE_NAME}=deadbeef` },
       }),
     );
@@ -135,5 +138,52 @@ describe("proxy matcher", () => {
     expect(guarded("/")).toBe(true);
     expect(guarded("/manifest.json")).toBe(false);
     expect(guarded("/icons/icon-192.png")).toBe(false);
+  });
+});
+
+describe("proxy matcher, both entries, as Next.js evaluates them", () => {
+  const runs = (url: string) => unstable_doesMiddlewareMatch({ config, url });
+  const runsWith = (entry: string, url: string) => unstable_doesMiddlewareMatch({ config: { matcher: [entry] }, url });
+
+  it("reaches /auth pages through the second entry only", () => {
+    expect(runs("/auth/sign-in")).toBe(true);
+    expect(runsWith(config.matcher[0], "/auth/sign-in")).toBe(false);
+    expect(runsWith(config.matcher[1], "/auth/sign-in")).toBe(true);
+    expect(runs("/auth/anything/else")).toBe(true);
+  });
+
+  it("never reaches the auth API, through either entry", () => {
+    for (const url of ["/api/auth/x", "/api/auth/get-session", "/api/auth/sign-in/email-otp"]) {
+      expect(runs(url)).toBe(false);
+      expect(runsWith(config.matcher[0], url)).toBe(false);
+      expect(runsWith(config.matcher[1], url)).toBe(false);
+    }
+  });
+
+  it("still reaches the app, and still skips the PWA files", () => {
+    expect(runs("/enveloppes")).toBe(true);
+    expect(runs("/")).toBe(true);
+    expect(runs("/auth")).toBe(true);
+    expect(runs("/sw.js")).toBe(false);
+    expect(runs("/manifest.json")).toBe(false);
+  });
+});
+
+describe("proxy on /auth/ pages outside DEMO_MODE", () => {
+  beforeEach(() => {
+    authMiddlewareSpy.mockClear();
+    authMiddlewareSpy.mockReturnValue(NextResponse.redirect(new URL("https://app.test/auth/sign-in")));
+  });
+
+  // Regression: the second matcher entry routes /auth/ pages through the proxy. Without
+  // the early return, the middleware would answer the signed-out sign-in page with a
+  // redirect to itself, a loop.
+  it("serves the sign-in page without the middleware, so it cannot redirect to itself", async () => {
+    const response = await proxy(request("https://app.test/auth/sign-in"));
+
+    expect(authMiddlewareSpy).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 });
