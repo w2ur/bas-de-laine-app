@@ -40,8 +40,8 @@ as oklch; hex below is the conversion:
 | `--foreground` | body text and every figure | `#1f1916` | `#f9f6f3` |
 | `--muted-foreground` | secondary text, full strength | `#68625e` | `#9e9793` |
 | `--border` | rules between ledger lines | `#e3e1de` | `#3f3936` |
-| `--primary` / `--success` | sage: the one primary action per screen, and money kept | `#448061` | `#52a27a` |
-| `--spend` / `--destructive` | terracotta: **money out, and nothing else** | `#c16d45` | `#dc855d` |
+| `--primary` / `--success` | sage: the one primary action per screen, and money kept | `#357153` | `#52a27a` |
+| `--spend` / `--destructive` | terracotta: **money out, and nothing else** | `#aa5830` | `#dc855d` |
 | `--fill-action` | blue: money in (a fill, a transfer received) | `#4f84ba` | `#5e93ca` |
 
 Colour rules:
